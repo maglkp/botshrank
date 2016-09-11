@@ -1,6 +1,6 @@
 0 0
-b-ooo
--dooo
+b--oo
+--ooo
 ooooo
 ooooo
 ooooo

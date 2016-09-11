@@ -3,11 +3,16 @@ import os.path
 
 N = 5
 GRID_FILE = "grid.dat"
+NOT_FOUND = -1
+MAX_DIST = 10 * N
 
 
 # prints next action
-def go_to_nearest_fog():
-    pass
+def go_to_nearest_fog(bot_pos, board):
+    nearest_fog = find_nearest_cell('o', board, bot_pos)
+    if nearest_fog == NOT_FOUND:
+        print("Fog not found and expected!")
+    return nearest_fog
 
 
 def next_move(posx, posy, board):
@@ -18,25 +23,32 @@ def next_move(posx, posy, board):
 
     board = retrieve_merge_grid(board)
 
-    # go through all fields and find closest dust
+    # go through all fields and go to closest dust
     bot_pos = (posx, posy)
-    next_dust = -1
-    next_dust_dist = 10 * N
-    for r in range(N):
-        for c in range(N):
-            if board[r][c] == 'd':
-                dist = distance(bot_pos, (r, c))
-                if dist < next_dust_dist:
-                    next_dust_dist = dist
-                    next_dust = (r, c)
+    next_dust = find_nearest_cell('d', board, bot_pos)
 
-    # if dust is visible go to closest dust
-    if next_dust != -1:
+    # if dust is visible go to closest dust else bo to closest fog
+    # assume there is always fog if dust not found
+    if next_dust != NOT_FOUND:
         print(get_next_move(bot_pos, next_dust))
     else:
-        print(go_to_nearest_fog())
+        print(get_next_move(bot_pos, go_to_nearest_fog(bot_pos, board)))
 
     save_board(board)
+
+
+# find cell with given type nearest to the bot
+def find_nearest_cell(cell_type, board, bot_pos):
+    nearest_pos = NOT_FOUND
+    nearest_dist = MAX_DIST
+    for r in range(N):
+        for c in range(N):
+            if board[r][c] == cell_type:
+                dist = distance(bot_pos, (r, c))
+                if dist < nearest_dist:
+                    nearest_dist = dist
+                    nearest_pos = (r, c)
+    return nearest_pos
 
 
 def read_grid():
@@ -86,5 +98,3 @@ if __name__ == "__main__":
     pos = [int(i) for i in input().strip().split()]
     board = [[j for j in input().strip()] for i in range(N)]
     next_move(pos[0], pos[1], board)
-
-
