@@ -5,11 +5,11 @@ N = 5
 GRID_FILE = "grid.dat"
 NOT_FOUND = -1
 MAX_DIST = 10 * N
-
+FOG = 'o'
 
 # prints next action
 def go_to_nearest_fog(bot_pos, board):
-    nearest_fog = find_nearest_cell('o', board, bot_pos)
+    nearest_fog = find_nearest_cell(FOG, board, bot_pos)
     if nearest_fog == NOT_FOUND:
         print("Fog not found and expected!")
     return nearest_fog
@@ -60,7 +60,7 @@ def read_grid():
 def merge_grid(saved_grid, current_grid):
     for i in range(N):
         for j in range(N):
-            if saved_grid[i][j] == 'd' or saved_grid[i][j] == '-':
+            if current_grid[i][j] == FOG and saved_grid[i][j] == 'd' or saved_grid[i][j] == '-':
                 current_grid[i][j] = saved_grid[i][j]
     return current_grid
 
