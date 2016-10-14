@@ -2,7 +2,10 @@
 import os.path
 import copy
 
-GRID_FILE = "maze.dat"
+import sys
+
+GRID_FILE_P1 = "maze_p1.dat"
+GRID_FILE_P2 = "maze_p2.dat"
 NOT_FOUND = -1
 UP = "UP"
 DOWN = "DOWN"
@@ -19,13 +22,24 @@ NO_PATH = "No path found"
 HERO = 'b'
 
 
+def print_grid(grid):
+    for line in grid:
+        for cell in line:
+            sys.stdout.write(cell)
+        sys.stdout.write("\n")
+    sys.stdout.write("\n")
+
+
 # reads and returns cached bot position, facing and grid as a 3-tuple
 # if no cache file exists assume neutral (UP) initial facing, (1,1) and no grid is returned
-def read_grid():
-    if not os.path.isfile(GRID_FILE):
+def read_grid(bot_num):
+
+    grid_file = (GRID_FILE_P1 if bot_num == 1 else GRID_FILE_P2)
+
+    if not os.path.isfile(grid_file):
         return (1, 1), UP, NOT_FOUND
 
-    f = open(GRID_FILE, 'r')
+    f = open(grid_file, 'r')
     contents = [line.strip() for line in f]
     pos = [int(i) for i in contents[0].strip().split()]
     facing = contents[1]
@@ -78,11 +92,11 @@ def expand_grid_when_bot_on_edge(grid_map, pos):
 
     # add row above map
     if row == 0:
-        grid_map.insert(0, [FOG for _ in range(max_c)])
+        grid_map.insert(0, [FOG for _ in range(max_c + 1)])
         return grid_map, (pos[0] + 1, pos[1])
     # add row below map
     if row == max_r:
-        grid_map.append([FOG for _ in range(max_c)])
+        grid_map.append([FOG for _ in range(max_c + 1)])
         return grid_map, pos
     # add col on the left
     if col == 0:
@@ -114,8 +128,8 @@ def add_surroundings_to_grid(grid_map, surr, pos):
 
 
 def exit_nearby(grid_map, bot_pos):
-    x = bot_pos(0)
-    y = bot_pos(1)
+    x = bot_pos[0]
+    y = bot_pos[1]
     return grid_map[x][y - 1] == EXIT or \
            grid_map[x][y + 1] == EXIT or \
            grid_map[x - 1][y] == EXIT or \
@@ -131,7 +145,20 @@ def find_next_target(grid_map, bot_pos):
         raise NO_PATH
 
     # return first cell on the path to chosen target
-    return path(0)
+    return path[0]
+
+
+def visit(search_grid, cell, path):
+    neighbours = get_unvisited_neighbours(search_grid, cell)
+    search_grid[cell[0]][cell[1]] = VISITED
+
+    for nb in neighbours:
+        if is_destination_candidate(search_grid, nb):
+            return path + [nb]
+        val = visit(search_grid, nb, path + [nb])
+        if val != NOT_FOUND:
+            return val
+    return NOT_FOUND
 
 
 def get_unvisited_neighbours(search_grid, pos):
@@ -165,19 +192,6 @@ def is_destination_candidate(search_grid, pos):
     return pos[0] == 0 or pos[1] == 0 or pos[0] == max_r or pos[1] == max_c
 
 
-def visit(search_grid, cell, path):
-    neighbours = get_unvisited_neighbours(search_grid, cell)
-    search_grid[cell[0]][cell[1]] = VISITED
-
-    for nb in neighbours:
-        if is_destination_candidate(nb, search_grid):
-            return path + [nb]
-        val = visit(search_grid, nb, path + [nb])
-        if val != NOT_FOUND:
-            return val
-    return NOT_FOUND
-
-
 def go_to_exit(grid_map, bot_pos):
     x = bot_pos(0)
     y = bot_pos(1)
@@ -208,33 +222,6 @@ def get_move_to_neighbour(neighbour, bot_pos):
         return LEFT
 
 
-def next_move(surr):
-    # read cached grid map, current bot position and its last move (facing)
-    bot_pos, facing, grid_map = read_grid()
-
-    # normalize the current surroundings to match the grid map direction by rotating it
-    surr = normalize_grid(surr, facing)
-
-    # if there was no cached map there initialize it with the current surroundings
-    if grid_map == NOT_FOUND:
-        grid_map = surr
-
-    # expand the map container if the bot is at the edge and update its position
-    grid_map, bot_pos = expand_grid_when_bot_on_edge(grid_map, bot_pos)
-    # add current bot's surroundings
-    grid_map = add_surroundings_to_grid(grid_map, surr, bot_pos)
-
-    if exit_nearby(grid_map, bot_pos):
-        current_action = go_to_exit(grid_map, bot_pos)
-    else:
-        current_action = get_move_to_neighbour(find_next_target(grid_map, bot_pos), bot_pos)
-
-    # save env to file
-
-    # translate action to local coordinates
-    return translate_move_into_local_coord(facing, current_action)
-
-
 # translates move taken on global map to local surroundings defined by previous facing
 # (bot sees what is in front of it as above it)
 def translate_move_into_local_coord(facing, move):
@@ -262,7 +249,79 @@ def rotate_90_right(move):
     raise FACING_ERR
 
 
+def save_board(board, bot_pos, facing, bot_num):
+
+    grid_file = (GRID_FILE_P1 if bot_num == 1 else GRID_FILE_P2)
+    f = open(grid_file, 'w')
+
+    f.write(str(bot_pos[0]) + " " + str(bot_pos[1]) + '\n')
+    f.write(facing + '\n')
+    for line in board:
+        f.write("".join(line) + '\n')
+    f.close()
+
+
+# updates bot position by 1 cell based on current position and current action
+def update_bot_pos(bot_pos, current_action):
+    if current_action == UP:
+        return bot_pos[0] - 1, bot_pos[1]
+    if current_action == RIGHT:
+        return bot_pos[0], bot_pos[1] + 1
+    if current_action == DOWN:
+        return bot_pos[0] + 1, bot_pos[1]
+    if current_action == LEFT:
+        return bot_pos[0], bot_pos[1] - 1
+    raise FACING_ERR
+
+
+def next_move(surr, bot_num):
+    # read cached grid map, current bot position and its last move (facing)
+    bot_pos, facing, grid_map = read_grid(bot_num)
+
+    # normalize the current surroundings to match the grid map direction by rotating it
+    surr = normalize_grid(surr, facing)
+
+    # if there was no cached map there initialize it with the current surroundings
+    if grid_map == NOT_FOUND:
+        grid_map = surr
+
+    # expand the map container if the bot is at the edge and update its position
+    grid_map, bot_pos = expand_grid_when_bot_on_edge(grid_map, bot_pos)
+
+    # add current bot's surroundings
+    grid_map = add_surroundings_to_grid(grid_map, surr, bot_pos)
+
+    if exit_nearby(grid_map, bot_pos):
+        current_action = go_to_exit(grid_map, bot_pos)
+    else:
+        current_action = get_move_to_neighbour(find_next_target(grid_map, bot_pos), bot_pos)
+
+    bot_pos = update_bot_pos(bot_pos, current_action)
+
+    # save env to file
+    # new_bot_pos, this_move_global_coord, grid
+    save_board(grid_map, bot_pos, current_action, bot_num)
+
+    # translate action to local (original) coordinates
+    move_into_local_coord = translate_move_into_local_coord(facing, current_action)
+    return move_into_local_coord
+
+
+def read_grid_from_file(path):
+    f = open(path, 'r')
+    contents = [line.strip() for line in f]
+    grid = [[j for j in line.strip()] for line in contents]
+    f.close()
+    return grid
+
+
+def test_visit():
+    grid = read_grid_from_file("visit_input01.txt")
+    bot_pos = (2, 2)
+    print(visit(grid, bot_pos, []))
+
+
 if __name__ == "__main__":
-    bot_num = input().strip()
+    bot_num = int(input().strip())
     surroundings = [[j for j in input().strip()] for i in range(SURROUNDINGS_SIZE)]
-    next_move(surroundings)
+    print(next_move(surroundings, bot_num))
