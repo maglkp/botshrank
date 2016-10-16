@@ -18,6 +18,7 @@ VISITED = '^'
 SURROUNDINGS_SIZE = 3
 FACING_ERR = "Invalid facing"
 ACTION_ERR = "Invalid action"
+DIFF_ERR = "Invalid diff"
 NO_PATH = "No path found"
 HERO = 'b'
 
@@ -33,7 +34,6 @@ def print_grid(grid):
 # reads and returns cached bot position, facing and grid as a 3-tuple
 # if no cache file exists assume neutral (UP) initial facing, (1,1) and no grid is returned
 def read_grid(bot_num):
-
     grid_file = (GRID_FILE_P1 if bot_num == 1 else GRID_FILE_P2)
 
     if not os.path.isfile(grid_file):
@@ -138,8 +138,13 @@ def exit_nearby(grid_map, bot_pos):
 
 # finds nearest grid
 def find_next_target(grid_map, bot_pos):
-    search_grid = copy.deepcopy(grid_map)
-    path = visit(search_grid, bot_pos, [])
+    # search_grid = copy.deepcopy(grid_map)
+    # path = visit_dfs(search_grid, bot_pos, [])
+    path = visit_bfs_with_tracking(grid_map, bot_pos)
+    #sys.stderr.write(str(bot_pos[0]) + " " + str(bot_pos[1]))
+    #sys.stderr.write("\n")
+    #sys.stderr.write(str(path[0][0]) + " " + str(path[0][1]))
+    #sys.stderr.write(','.join(path))
 
     if len(path) == 0:
         raise NO_PATH
@@ -148,14 +153,32 @@ def find_next_target(grid_map, bot_pos):
     return path[0]
 
 
-def visit(search_grid, cell, path):
+# BFS search for a cell with path tracking
+def visit_bfs_with_tracking(grid_map, bot_pos):
+    search_grid = copy.deepcopy(grid_map)
+    # BFS queue contains the current grid cell plus the path that leads to it from the bot position
+    queue = [(bot_pos, [])]
+
+    while len(queue) > 0:
+        (cell, path) = queue.pop()
+        search_grid[cell[0]][cell[1]] = VISITED
+
+        if is_destination_candidate(search_grid, cell):
+            return path
+        for nb in get_unvisited_neighbours(search_grid, cell):
+            queue.insert(0, (nb, path + [nb]))
+
+    raise NO_PATH
+
+
+def visit_dfs(search_grid, cell, path):
     neighbours = get_unvisited_neighbours(search_grid, cell)
     search_grid[cell[0]][cell[1]] = VISITED
 
     for nb in neighbours:
         if is_destination_candidate(search_grid, nb):
             return path + [nb]
-        val = visit(search_grid, nb, path + [nb])
+        val = visit_dfs(search_grid, nb, path + [nb])
         if val != NOT_FOUND:
             return val
     return NOT_FOUND
@@ -193,8 +216,8 @@ def is_destination_candidate(search_grid, pos):
 
 
 def go_to_exit(grid_map, bot_pos):
-    x = bot_pos(0)
-    y = bot_pos(1)
+    x = bot_pos[0]
+    y = bot_pos[1]
 
     if grid_map[x][y - 1] == EXIT:
         return LEFT
@@ -212,14 +235,18 @@ def go_to_exit(grid_map, bot_pos):
 def get_move_to_neighbour(neighbour, bot_pos):
     dr = neighbour[0] - bot_pos[0]
     dc = neighbour[1] - bot_pos[1]
+    #sys.stderr.write("dr" + str(dr) + "\n")
+    #sys.stderr.write("dc" + str(dc) + "\n")
     if dr == 1:
         return DOWN
     if dr == -1:
         return UP
     if dc == 1:
         return RIGHT
-    if dc == 1:
+    if dc == -1:
         return LEFT
+
+    raise DIFF_ERR
 
 
 # translates move taken on global map to local surroundings defined by previous facing
@@ -250,7 +277,6 @@ def rotate_90_right(move):
 
 
 def save_board(board, bot_pos, facing, bot_num):
-
     grid_file = (GRID_FILE_P1 if bot_num == 1 else GRID_FILE_P2)
     f = open(grid_file, 'w')
 
@@ -315,13 +341,23 @@ def read_grid_from_file(path):
     return grid
 
 
-def test_visit():
+def test_visit_dfs():
     grid = read_grid_from_file("visit_input01.txt")
-    bot_pos = (2, 2)
-    print(visit(grid, bot_pos, []))
+    # [(2, 1), (1, 1), (1, 2), (2, 2), (3, 2), (4, 2)]
+    bot_pos = (1, 1)
+    print(visit_dfs(grid, bot_pos, []))
+
+
+def test_visit_bfs():
+    grid = read_grid_from_file("visit_input01.txt")
+    bot_pos = (2, 5)
+    path = visit_bfs_with_tracking(grid, bot_pos)
+    #sys.stderr.write(','.join(path))
+    print(path)
 
 
 if __name__ == "__main__":
+    #test_visit_bfs()
     bot_num = int(input().strip())
     surroundings = [[j for j in input().strip()] for i in range(SURROUNDINGS_SIZE)]
     print(next_move(surroundings, bot_num))
