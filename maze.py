@@ -80,7 +80,6 @@ def rot_right(grid):
 
 # adds extra row or column - not both as the rules of the prevent it with no cross moves
 # and preventing bot from entering the world edge.
-# TODO test this thing again
 def expand_grid_when_bot_on_edge(grid_map, pos):
     # max row value or length of any column
     max_r = len(grid_map) - 1
@@ -141,10 +140,6 @@ def find_next_target(grid_map, bot_pos):
     # search_grid = copy.deepcopy(grid_map)
     # path = visit_dfs(search_grid, bot_pos, [])
     path = visit_bfs_with_tracking(grid_map, bot_pos)
-    #sys.stderr.write(str(bot_pos[0]) + " " + str(bot_pos[1]))
-    #sys.stderr.write("\n")
-    #sys.stderr.write(str(path[0][0]) + " " + str(path[0][1]))
-    #sys.stderr.write(','.join(path))
 
     if len(path) == 0:
         raise NO_PATH
@@ -186,12 +181,16 @@ def visit_dfs(search_grid, cell, path):
 
 def get_unvisited_neighbours(search_grid, pos):
     unvisited_neighbours = []
-    if is_unvisited(search_grid, pos[0] - 1, pos[1]):
-        unvisited_neighbours.append((pos[0] - 1, pos[1]))
+    # DOWN
     if is_unvisited(search_grid, pos[0] + 1, pos[1]):
         unvisited_neighbours.append((pos[0] + 1, pos[1]))
+    # LEFT
     if is_unvisited(search_grid, pos[0], pos[1] - 1):
         unvisited_neighbours.append((pos[0], pos[1] - 1))
+    # UP
+    if is_unvisited(search_grid, pos[0] - 1, pos[1]):
+        unvisited_neighbours.append((pos[0] - 1, pos[1]))
+    # RIGHT
     if is_unvisited(search_grid, pos[0], pos[1] + 1):
         unvisited_neighbours.append((pos[0], pos[1] + 1))
     return unvisited_neighbours
@@ -235,8 +234,6 @@ def go_to_exit(grid_map, bot_pos):
 def get_move_to_neighbour(neighbour, bot_pos):
     dr = neighbour[0] - bot_pos[0]
     dc = neighbour[1] - bot_pos[1]
-    #sys.stderr.write("dr" + str(dr) + "\n")
-    #sys.stderr.write("dc" + str(dc) + "\n")
     if dr == 1:
         return DOWN
     if dr == -1:
@@ -343,7 +340,6 @@ def read_grid_from_file(path):
 
 def test_visit_dfs():
     grid = read_grid_from_file("visit_input01.txt")
-    # [(2, 1), (1, 1), (1, 2), (2, 2), (3, 2), (4, 2)]
     bot_pos = (1, 1)
     print(visit_dfs(grid, bot_pos, []))
 
